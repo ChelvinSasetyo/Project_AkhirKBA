@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
@@ -9,112 +11,184 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-# =========================
-# KONFIGURASI HALAMAN
-# =========================
-st.set_page_config(page_title="Dashboard Superstore", layout="wide", page_icon="📊")
 
-# =========================
-# THEME TOGGLE (SIANG/MALAM)
-# =========================
-# Tombol pengganti tema diletakkan di sidebar paling atas
-# st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3094/3094926.png", width=100)
-theme_mode = st.sidebar.radio("🌗 Tema Visual:", ["🌞 Siang (Light Nature)", "🌙 Malam (Dark Forest)"], horizontal=True)
+st.set_page_config(
+    page_title="Dashboard Superstore",
+    page_icon="",
+    layout="wide"
+)
 
-is_dark = (theme_mode == "🌙 Malam (Dark Forest)")
 
-# Konfigurasi Palet Warna Tema Alam (Hijau)
-if is_dark:
-    # Nuansa malam di hutan
-    app_bg = "#0d1f15"
-    sidebar_bg = "#0a170f"
-    text_col = "#e8f5e9"
-    card_bg = "#153322"
-    accent_col = "#4caf50"
-    plot_template = "plotly_dark"
-    chart_colors = ['#81c784', '#aed581', '#4db6ac', '#81d4fa', '#ffb74d']
-    status_color_map = {"Profit": "#66bb6a", "Loss": "#ef5350"}
-    cm_color_scale = "Greens"
-else:
-    # Nuansa siang di taman
-    app_bg = "#f4fcf5"
-    sidebar_bg = "#e8f5e9"
-    text_col = "#1b3320"
-    card_bg = "#ffffff"
-    accent_col = "#2e7d32"
-    plot_template = "plotly_white"
-    chart_colors = ['#2e7d32', '#558b2f', '#00695c', '#0277bd', '#e65100']
-    status_color_map = {"Profit": "#1b5e20", "Loss": "#c62828"}
-    cm_color_scale = "Greens"
+# Styling dashboard
+st.markdown("""
+<style>
+    :root {
+        --bg-main: #061b33;
+        --bg-panel: #0b2a4a;
+        --bg-card: #0d355f;
+        --border: rgba(79, 195, 247, 0.35);
+        --text-main: #eaf6ff;
+        --text-muted: #a9c7df;
+        --blue: #38d5ff;
+        --green: #3df5a0;
+        --orange: #ffbd59;
+        --red: #ff5d73;
+    }
 
-# =========================
-# INJEKSI CUSTOM CSS TEMA
-# =========================
-st.markdown(f"""
-    <style>
-    /* Background utama */
-    .stApp {{
-        background-color: {app_bg};
-        color: {text_col};
-    }}
-    /* Background sidebar */
-    [data-testid="stSidebar"] {{
-        background-color: {sidebar_bg} !important;
-    }}
-    /* Header transparant */
-    [data-testid="stHeader"] {{
-        background-color: rgba(0,0,0,0);
-    }}
-    /* Warna Teks Global */
-    .stMarkdown, h1, h2, h3, p, label {{
-        color: {text_col} !important;
-    }}
-    /* Card KPI / Metric */
-    div[data-testid="metric-container"] {{
-        background-color: {card_bg};
-        border: 1px solid {accent_col}40;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border-left: 6px solid {accent_col};
-    }}
-    div[data-testid="metric-container"] label {{
-        color: {text_col} !important;
-        opacity: 0.8;
-    }}
-    div[data-testid="metric-container"] div {{
-        color: {text_col} !important;
-    }}
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {{
+    .stApp {
+        background: linear-gradient(135deg, #061b33 0%, #082a4f 50%, #03101f 100%);
+        color: var(--text-main);
+    }
+
+    [data-testid="stSidebar"] {
+        background: #041526;
+        border-right: 1px solid var(--border);
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(0,0,0,0);
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+
+    h1, h2, h3, h4, p, label, span, div {
+        color: var(--text-main);
+    }
+
+    .main-title {
+        font-size: 2.1rem;
+        font-weight: 800;
+        margin-bottom: 0.2rem;
+    }
+
+    .subtitle {
+        color: var(--text-muted);
+        font-size: 1rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .kpi-card {
+        background: linear-gradient(145deg, rgba(13, 53, 95, 0.98), rgba(8, 35, 64, 0.98));
+        border: 1px solid var(--border);
+        border-left: 5px solid var(--blue);
+        border-radius: 16px;
+        padding: 16px 18px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+        min-height: 112px;
+    }
+
+    .kpi-label {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .kpi-value {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+
+    .kpi-note {
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        margin-top: 0.45rem;
+    }
+
+    .section-card {
+        background: rgba(8, 39, 72, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.20);
+        margin-bottom: 1rem;
+    }
+
+    .small-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.4rem;
+    }
+
+    div[data-testid="metric-container"] {
+        background: linear-gradient(145deg, rgba(13, 53, 95, 0.98), rgba(8, 35, 64, 0.98));
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.20);
+    }
+
+    div[data-testid="stDataFrame"] {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
-    }}
-    .stTabs [data-baseweb="tab"] {{
-        background-color: {card_bg};
-        border-radius: 8px 8px 0px 0px;
-        border: 1px solid {accent_col}40;
-        border-bottom: none;
-        padding: 10px 20px;
-        color: {text_col} !important;
-    }}
-    .stTabs [aria-selected="true"] {{
-        background-color: {accent_col}20 !important;
-        border-bottom: 3px solid {accent_col} !important;
-    }}
-    </style>
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(13, 53, 95, 0.85);
+        border-radius: 12px;
+        padding: 10px 16px;
+        border: 1px solid var(--border);
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: rgba(56, 213, 255, 0.20) !important;
+        border: 1px solid rgba(56, 213, 255, 0.80) !important;
+    }
+
+    hr {
+        border-color: rgba(79, 195, 247, 0.25);
+    }
+</style>
 """, unsafe_allow_html=True)
 
 
-# =========================
-# LOAD DATA
-# =========================
-@st.cache_data
-def load_data():
-    data = pd.read_csv("cleaned_superstore.csv")
+def prepare_data(data):
+    data = data.copy()
+    data.columns = data.columns.str.strip()
+
     data["order_date"] = pd.to_datetime(data["order_date"], errors="coerce")
-    data["ship_date"] = pd.to_datetime(data["ship_date"], errors="coerce")
-    data["year"] = data["year"].astype(int)
+
+    if "ship_date" in data.columns:
+        data["ship_date"] = pd.to_datetime(data["ship_date"], errors="coerce")
+
+    if "year" in data.columns:
+        data["year"] = data["year"].astype(int)
+
+    if "profit_status" not in data.columns and "profit" in data.columns:
+        data["profit_status"] = np.where(data["profit"] > 0, "Profit", "Loss")
+
+    if "month" not in data.columns:
+        data["month"] = data["order_date"].dt.month
+
+    if "month_name" not in data.columns:
+        data["month_name"] = data["order_date"].dt.month_name()
+
+    if "shipping_days" not in data.columns and {"ship_date", "order_date"}.issubset(data.columns):
+        data["shipping_days"] = (data["ship_date"] - data["order_date"]).dt.days
+
+    if "profit_margin" not in data.columns:
+        data["profit_margin"] = np.where(data["sales"] != 0, data["profit"] / data["sales"], 0)
+
     return data
+
+
+@st.cache_data
+def load_default_data():
+    data = pd.read_csv("cleaned_superstore.csv")
+    return prepare_data(data)
+
 
 @st.cache_data
 def load_forecast():
@@ -123,21 +197,38 @@ def load_forecast():
     forecast["month_name"] = forecast["order_date"].dt.month_name()
     return forecast
 
-df = load_data()
 
-
-# =========================
-# TRAIN MODEL ML
-# =========================
 @st.cache_resource
 def train_profit_loss_model(data):
-    features = ["sales", "quantity", "discount", "shipping_cost", "shipping_days", 
-                "segment", "market", "region", "category", "sub_category", "ship_mode", "order_priority"]
-    X = data[features]
+    features = [
+        "sales",
+        "quantity",
+        "discount",
+        "shipping_cost",
+        "shipping_days",
+        "segment",
+        "market",
+        "region",
+        "category",
+        "sub_category",
+        "ship_mode",
+        "order_priority"
+    ]
+
+    existing_features = [col for col in features if col in data.columns]
+
+    X = data[existing_features]
     y = data["profit_status"]
 
-    numeric_features = ["sales", "quantity", "discount", "shipping_cost", "shipping_days"]
-    categorical_features = ["segment", "market", "region", "category", "sub_category", "ship_mode", "order_priority"]
+    numeric_features = [
+        col for col in ["sales", "quantity", "discount", "shipping_cost", "shipping_days"]
+        if col in existing_features
+    ]
+
+    categorical_features = [
+        col for col in existing_features
+        if col not in numeric_features
+    ]
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -149,205 +240,705 @@ def train_profit_loss_model(data):
     model = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("classifier", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
+            ("classifier", RandomForestClassifier(
+                n_estimators=100,
+                random_state=42,
+                n_jobs=-1
+            )),
         ]
     )
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y
+    )
+
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
-    accuracy = accuracy_score(y_test, y_pred)
     labels = ["Loss", "Profit"]
+
+    accuracy = accuracy_score(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred, labels=labels)
     report = classification_report(y_test, y_pred, output_dict=True)
 
-    return accuracy, cm, report
+    feature_names = model.named_steps["preprocessor"].get_feature_names_out()
+    feature_importance = model.named_steps["classifier"].feature_importances_
+
+    importance_df = pd.DataFrame({
+        "Feature": feature_names,
+        "Importance": feature_importance
+    })
+
+    importance_df["Feature"] = (
+        importance_df["Feature"]
+        .str.replace("cat__", "", regex=False)
+        .str.replace("num__", "", regex=False)
+        .str.replace("_", " ", regex=False)
+    )
+
+    importance_df = importance_df.sort_values(
+        "Importance",
+        ascending=False
+    ).head(15)
+
+    return accuracy, cm, report, importance_df
 
 
-# =========================
-# HEADER DASHBOARD
-# =========================
-st.title("Dashboard Analitik & Prediksi Superstore")
-st.markdown("Sistem ini menampilkan visualisasi penjualan interaktif, **Klasifikasi Machine Learning (Profit/Loss)**, serta **Forecasting 2015**.")
-st.divider()
+with st.sidebar:
+    st.markdown("### Panel Filter")
+    st.caption("Gunakan filter berikut untuk menyesuaikan data yang ditampilkan.")
+
+    uploaded_file = st.file_uploader(
+        "Upload data bersih CSV/XLSX",
+        type=["csv", "xlsx"]
+    )
 
 
-# =========================
-# SIDEBAR FILTER
-# =========================
+if uploaded_file is not None:
+    if uploaded_file.name.endswith(".xlsx"):
+        df = pd.read_excel(uploaded_file)
+    else:
+        df = pd.read_csv(uploaded_file)
+
+    df = prepare_data(df)
+else:
+    df = load_default_data()
+
+
+st.markdown(
+    '<div class="main-title">Dashboard Analitik Penjualan Superstore</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<div class="subtitle">Visualisasi data penjualan, analisis profitabilitas, klasifikasi transaksi, dan prediksi performa tahun 2015.</div>',
+    unsafe_allow_html=True
+)
+
+
 with st.sidebar:
     st.divider()
-    st.title("Parameter Filter")
-    st.markdown("Sesuaikan data yang ingin dianalisis:")
+    st.markdown("### Filter Data")
 
-    year_options = sorted(df["year"].unique())
-    selected_year = st.multiselect("Pilih Tahun", year_options, default=year_options)
+    year_options = sorted(df["year"].dropna().astype(int).unique())
+    selected_year = st.multiselect(
+        "Tahun",
+        year_options,
+        default=year_options
+    )
 
     market_options = sorted(df["market"].dropna().unique())
-    selected_market = st.multiselect("Pilih Market", market_options, default=market_options)
+    selected_market = st.multiselect(
+        "Market",
+        market_options,
+        default=market_options
+    )
+
+    region_options = sorted(df["region"].dropna().unique())
+    selected_region = st.multiselect(
+        "Region",
+        region_options,
+        default=region_options
+    )
 
     category_options = sorted(df["category"].dropna().unique())
-    selected_category = st.multiselect("Pilih Kategori", category_options, default=category_options)
+    selected_category = st.multiselect(
+        "Kategori",
+        category_options,
+        default=category_options
+    )
 
     segment_options = sorted(df["segment"].dropna().unique())
-    selected_segment = st.multiselect("Pilih Segment", segment_options, default=segment_options)
+    selected_segment = st.multiselect(
+        "Segment",
+        segment_options,
+        default=segment_options
+    )
 
-    st.markdown("### Status Transaksi")
-    show_profit = st.checkbox("Tampilkan transaksi Profit", value=True)
-    show_loss = st.checkbox("Tampilkan transaksi Loss", value=True)
+    status_options = ["Profit", "Loss"]
+    selected_status = st.multiselect(
+        "Status Transaksi",
+        status_options,
+        default=status_options
+    )
+
+    min_date = df["order_date"].min().date()
+    max_date = df["order_date"].max().date()
+
+    selected_date = st.date_input(
+        "Rentang Tanggal",
+        [min_date, max_date]
+    )
+
+    top_n = st.slider(
+        "Jumlah Sub-Kategori Teratas",
+        min_value=5,
+        max_value=20,
+        value=10
+    )
 
 
-# =========================
-# APPLY FILTER LOKAL
-# =========================
 filtered_df = df[
-    (df["year"].isin(selected_year)) & 
-    (df["market"].isin(selected_market)) & 
-    (df["category"].isin(selected_category)) & 
-    (df["segment"].isin(selected_segment))
+    (df["year"].astype(int).isin(selected_year)) &
+    (df["market"].isin(selected_market)) &
+    (df["region"].isin(selected_region)) &
+    (df["category"].isin(selected_category)) &
+    (df["segment"].isin(selected_segment)) &
+    (df["profit_status"].isin(selected_status))
 ]
 
-if show_profit and not show_loss:
-    filtered_df = filtered_df[filtered_df["profit_status"] == "Profit"]
-elif show_loss and not show_profit:
-    filtered_df = filtered_df[filtered_df["profit_status"] == "Loss"]
-elif not show_profit and not show_loss:
-    filtered_df = filtered_df.iloc[0:0]
+if isinstance(selected_date, (list, tuple)) and len(selected_date) == 2:
+    start_date = pd.to_datetime(selected_date[0])
+    end_date = pd.to_datetime(selected_date[1])
+
+    filtered_df = filtered_df[
+        (filtered_df["order_date"] >= start_date) &
+        (filtered_df["order_date"] <= end_date)
+    ]
 
 
-# =========================
-# RENDER TABS UTAMA
-# =========================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📈 Ringkasan Penjualan", 
-    "🤖 Klasifikasi ML (Profit/Loss)", 
-    "🔮 Forecasting 2015", 
-    "🗃️ Raw Data"
+if filtered_df.empty:
+    st.warning("Tidak ada data yang sesuai dengan filter yang dipilih.")
+    st.stop()
+
+
+total_sales = filtered_df["sales"].sum()
+total_profit = filtered_df["profit"].sum()
+total_orders = filtered_df["order_id"].nunique()
+total_quantity = filtered_df["quantity"].sum()
+avg_discount = filtered_df["discount"].mean()
+profit_margin = (total_profit / total_sales * 100) if total_sales != 0 else 0
+loss_count = (filtered_df["profit_status"] == "Loss").sum()
+
+
+def kpi_card(label, value, note, color):
+    return f"""
+    <div class="kpi-card" style="border-left-color:{color};">
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        <div class="kpi-note">{note}</div>
+    </div>
+    """
+
+
+kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+
+kpi1.markdown(
+    kpi_card("Total Penjualan", f"${total_sales:,.0f}", "Berdasarkan data terpilih", "#38d5ff"),
+    unsafe_allow_html=True
+)
+
+kpi2.markdown(
+    kpi_card("Total Profit", f"${total_profit:,.0f}", "Akumulasi keuntungan", "#3df5a0"),
+    unsafe_allow_html=True
+)
+
+kpi3.markdown(
+    kpi_card("Jumlah Order", f"{total_orders:,.0f}", "Order unik", "#ffbd59"),
+    unsafe_allow_html=True
+)
+
+kpi4.markdown(
+    kpi_card("Jumlah Produk", f"{total_quantity:,.0f}", "Total item terjual", "#9d7cff"),
+    unsafe_allow_html=True
+)
+
+kpi5.markdown(
+    kpi_card("Margin Profit", f"{profit_margin:.2f}%", "Profit terhadap penjualan", "#4de3c1"),
+    unsafe_allow_html=True
+)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+
+tab_overview, tab_ml, tab_forecast, tab_data = st.tabs([
+    "Ringkasan Data",
+    "Model Klasifikasi",
+    "Prediksi 2015",
+    "Tabel Data"
 ])
 
-# ---------------------------------
-# TAB 1: RINGKASAN PENJUALAN
-# ---------------------------------
-with tab1:
-    if filtered_df.empty:
-        st.warning("⚠️ Tidak ada data yang sesuai dengan filter yang dipilih di sidebar.")
-    else:
-        # Menampilkan KPI
-        total_sales = filtered_df["sales"].sum()
-        total_profit = filtered_df["profit"].sum()
-        total_quantity = filtered_df["quantity"].sum()
-        total_orders = filtered_df["order_id"].nunique()
-        profit_margin = (total_profit / total_sales * 100) if total_sales != 0 else 0
 
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("Total Sales", f"${total_sales:,.2f}")
-        col2.metric("Total Profit", f"${total_profit:,.2f}")
-        col3.metric("Total Quantity", f"{total_quantity:,.0f} Pcs")
-        col4.metric("Total Orders", f"{total_orders:,.0f}")
-        col5.metric("Profit Margin", f"{profit_margin:.2f}%")
-        
-        st.write("") # Spacer
+with tab_overview:
+    row1_col1, row1_col2, row1_col3 = st.columns([1.2, 2.2, 1.2])
 
-        # Grafik dalam Grid 2x2
-        g_col1, g_col2 = st.columns(2)
-        
-        with g_col1:
-            sales_by_year = filtered_df.groupby("year", as_index=False)["sales"].sum()
-            fig_sales_year = px.bar(sales_by_year, x="year", y="sales", title="Total Sales Berdasarkan Tahun", color_discrete_sequence=[chart_colors[0]])
-            fig_sales_year.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_sales_year, use_container_width=True)
-            
-            sales_by_region = filtered_df.groupby("region", as_index=False)["sales"].sum().sort_values('sales')
-            fig_sales_region = px.bar(sales_by_region, x="sales", y="region", orientation='h', title="Total Sales Berdasarkan Region", color_discrete_sequence=[chart_colors[1]])
-            fig_sales_region.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_sales_region, use_container_width=True)
+    with row1_col1:
+        st.markdown(
+            '<div class="section-card"><div class="small-title">Komposisi Transaksi</div>',
+            unsafe_allow_html=True
+        )
 
-        with g_col2:
-            profit_by_category = filtered_df.groupby("category", as_index=False)["profit"].sum()
-            fig_profit_category = px.pie(profit_by_category, values="profit", names="category", title="Proporsi Profit Berdasarkan Kategori", hole=0.4, color_discrete_sequence=chart_colors)
-            fig_profit_category.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_profit_category, use_container_width=True)
+        status_count = filtered_df["profit_status"].value_counts().reset_index()
+        status_count.columns = ["profit_status", "count"]
 
-            monthly_trend = filtered_df.groupby(["year", "month"], as_index=False).agg({"sales": "sum", "profit": "sum"})
-            monthly_trend["period"] = monthly_trend["year"].astype(str) + "-" + monthly_trend["month"].astype(str).str.zfill(2)
-            fig_monthly = px.line(monthly_trend, x="period", y=["sales", "profit"], markers=True, title="Tren Sales dan Profit per Bulan", color_discrete_sequence=[chart_colors[2], chart_colors[4]])
-            fig_monthly.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_monthly, use_container_width=True)
+        fig_status = px.pie(
+            status_count,
+            names="profit_status",
+            values="count",
+            hole=0.62,
+            color="profit_status",
+            color_discrete_map={
+                "Profit": "#3df5a0",
+                "Loss": "#ff5d73"
+            },
+            title="Transaksi Profit dan Loss"
+        )
 
-        # Scatter Plot Full Width
-        fig_discount_profit = px.scatter(filtered_df, x="discount", y="profit", color="profit_status", 
-                                         title="Hubungan Tingkat Diskon terhadap Status Profit/Loss", 
-                                         opacity=0.6, color_discrete_map=status_color_map)
-        fig_discount_profit.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-        st.plotly_chart(fig_discount_profit, use_container_width=True)
+        fig_status.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            margin=dict(t=45, b=15, l=15, r=15),
+            height=310
+        )
+
+        st.plotly_chart(fig_status, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown(
+            '<div class="section-card"><div class="small-title">Perbandingan Kategori</div>',
+            unsafe_allow_html=True
+        )
+
+        radar_df = filtered_df.groupby("category", as_index=False).agg({
+            "sales": "sum",
+            "profit": "sum"
+        })
+
+        radar_categories = radar_df["category"].tolist()
+        radar_values = radar_df["sales"].tolist()
+
+        if radar_categories:
+            radar_categories += [radar_categories[0]]
+            radar_values += [radar_values[0]]
+
+        fig_radar = go.Figure()
+
+        fig_radar.add_trace(go.Scatterpolar(
+            r=radar_values,
+            theta=radar_categories,
+            fill="toself",
+            name="Sales",
+            line=dict(color="#38d5ff")
+        ))
+
+        fig_radar.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            polar=dict(
+                bgcolor="rgba(0,0,0,0)",
+                radialaxis=dict(visible=True)
+            ),
+            height=330,
+            margin=dict(t=25, b=25, l=25, r=25),
+            showlegend=False
+        )
+
+        st.plotly_chart(fig_radar, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with row1_col2:
+        st.markdown(
+            '<div class="section-card"><div class="small-title">Tren Penjualan dan Profit</div>',
+            unsafe_allow_html=True
+        )
+
+        monthly_trend = (
+            filtered_df.groupby(["year", "month"], as_index=False)
+            .agg({"sales": "sum", "profit": "sum"})
+            .sort_values(["year", "month"])
+        )
+
+        monthly_trend["period"] = (
+            monthly_trend["year"].astype(str) + "-" +
+            monthly_trend["month"].astype(str).str.zfill(2)
+        )
+
+        fig_trend = px.line(
+            monthly_trend,
+            x="period",
+            y=["sales", "profit"],
+            markers=True,
+            title="Tren Sales dan Profit per Bulan",
+            color_discrete_sequence=["#38d5ff", "#3df5a0"]
+        )
+
+        fig_trend.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            height=390,
+            margin=dict(t=55, b=35, l=25, r=25),
+            legend_title_text="Metrik"
+        )
+
+        st.plotly_chart(fig_trend, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        gauge_col1, gauge_col2, gauge_col3 = st.columns(3)
+
+        with gauge_col1:
+            fig_margin = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=profit_margin,
+                number={"suffix": "%", "font": {"color": "#eaf6ff"}},
+                title={"text": "Margin Profit", "font": {"color": "#eaf6ff"}},
+                gauge={
+                    "axis": {
+                        "range": [None, max(50, profit_margin + 10)],
+                        "tickcolor": "#eaf6ff"
+                    },
+                    "bar": {"color": "#3df5a0"},
+                    "bgcolor": "rgba(0,0,0,0)",
+                    "bordercolor": "rgba(79,195,247,0.35)"
+                }
+            ))
+
+            fig_margin.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                height=240,
+                margin=dict(t=30, b=15, l=15, r=15)
+            )
+
+            st.plotly_chart(fig_margin, use_container_width=True)
+
+        with gauge_col2:
+            fig_discount = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=avg_discount * 100,
+                number={"suffix": "%", "font": {"color": "#eaf6ff"}},
+                title={"text": "Rata-Rata Diskon", "font": {"color": "#eaf6ff"}},
+                gauge={
+                    "axis": {"range": [0, 100], "tickcolor": "#eaf6ff"},
+                    "bar": {"color": "#ffbd59"},
+                    "bgcolor": "rgba(0,0,0,0)",
+                    "bordercolor": "rgba(79,195,247,0.35)"
+                }
+            ))
+
+            fig_discount.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                height=240,
+                margin=dict(t=30, b=15, l=15, r=15)
+            )
+
+            st.plotly_chart(fig_discount, use_container_width=True)
+
+        with gauge_col3:
+            loss_rate = loss_count / len(filtered_df) * 100 if len(filtered_df) else 0
+
+            fig_loss = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=loss_rate,
+                number={"suffix": "%", "font": {"color": "#eaf6ff"}},
+                title={"text": "Rasio Loss", "font": {"color": "#eaf6ff"}},
+                gauge={
+                    "axis": {"range": [0, 100], "tickcolor": "#eaf6ff"},
+                    "bar": {"color": "#ff5d73"},
+                    "bgcolor": "rgba(0,0,0,0)",
+                    "bordercolor": "rgba(79,195,247,0.35)"
+                }
+            ))
+
+            fig_loss.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                height=240,
+                margin=dict(t=30, b=15, l=15, r=15)
+            )
+
+            st.plotly_chart(fig_loss, use_container_width=True)
+
+    with row1_col3:
+        st.markdown(
+            '<div class="section-card"><div class="small-title">Penjualan Berdasarkan Region</div>',
+            unsafe_allow_html=True
+        )
+
+        region_sales = (
+            filtered_df.groupby("region", as_index=False)["sales"]
+            .sum()
+            .sort_values("sales", ascending=True)
+        )
+
+        fig_region = px.bar(
+            region_sales,
+            x="sales",
+            y="region",
+            orientation="h",
+            color="sales",
+            color_continuous_scale="Blues",
+            title="Total Sales per Region"
+        )
+
+        fig_region.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            height=370,
+            margin=dict(t=50, b=25, l=15, r=15),
+            coloraxis_showscale=False
+        )
+
+        st.plotly_chart(fig_region, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown(
+            '<div class="section-card"><div class="small-title">Sub-Kategori Teratas</div>',
+            unsafe_allow_html=True
+        )
+
+        top_sub = (
+            filtered_df.groupby("sub_category", as_index=False)["profit"]
+            .sum()
+            .sort_values("profit", ascending=False)
+            .head(top_n)
+        )
+
+        fig_top_sub = px.bar(
+            top_sub,
+            x="profit",
+            y="sub_category",
+            orientation="h",
+            color="profit",
+            color_continuous_scale="Teal",
+            title=f"{top_n} Sub-Kategori dengan Profit Tertinggi"
+        )
+
+        fig_top_sub.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            height=350,
+            margin=dict(t=50, b=25, l=15, r=15),
+            coloraxis_showscale=False
+        )
+
+        st.plotly_chart(fig_top_sub, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="section-card"><div class="small-title">Hubungan Diskon terhadap Profit</div>',
+        unsafe_allow_html=True
+    )
+
+    fig_scatter = px.scatter(
+        filtered_df,
+        x="discount",
+        y="profit",
+        color="profit_status",
+        size="sales",
+        hover_data=["category", "sub_category", "market", "region"],
+        title="Pola Diskon dan Profit",
+        opacity=0.62,
+        color_discrete_map={
+            "Profit": "#3df5a0",
+            "Loss": "#ff5d73"
+        }
+    )
+
+    fig_scatter.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#eaf6ff",
+        height=430,
+        margin=dict(t=55, b=30, l=30, r=30)
+    )
+
+    st.plotly_chart(fig_scatter, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ---------------------------------
-# TAB 2: KLASIFIKASI ML
-# ---------------------------------
-with tab2:
-    st.subheader("Model Klasifikasi Random Forest")
-    st.markdown("Algoritma Machine Learning dilatih menggunakan puluhan ribu data historis untuk **memprediksi apakah sebuah transaksi akan menghasilkan Keuntungan (Profit) atau Kerugian (Loss)** berdasarkan atribut seperti biaya pengiriman, diskon, dan kategori produk.")
-    
-    accuracy, cm, report = train_profit_loss_model(df)
-    
-    col_acc, col_space = st.columns([1, 3])
-    with col_acc:
-        st.metric("Tingkat Akurasi Prediksi", f"{accuracy * 100:.2f}%")
+with tab_ml:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
 
-    ml_col1, ml_col2 = st.columns(2)
-    
-    with ml_col1:
-        cm_df = pd.DataFrame(cm, index=["Actual Loss", "Actual Profit"], columns=["Predicted Loss", "Predicted Profit"])
-        fig_cm = px.imshow(cm_df, text_auto=True, title="Confusion Matrix", color_continuous_scale=cm_color_scale)
-        fig_cm.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
+    st.subheader("Klasifikasi Transaksi Profit dan Loss")
+
+    st.write(
+        "Model Random Forest digunakan untuk mengklasifikasikan transaksi ke dalam kategori Profit atau Loss. "
+        "Fitur yang digunakan meliputi sales, quantity, discount, shipping cost, kategori produk, wilayah, dan metode pengiriman."
+    )
+
+    accuracy, cm, report, importance_df = train_profit_loss_model(df)
+
+    ml_kpi1, ml_kpi2, ml_kpi3 = st.columns(3)
+
+    ml_kpi1.metric("Akurasi", f"{accuracy * 100:.2f}%")
+    ml_kpi2.metric("Jumlah Data", f"{len(df):,}")
+    ml_kpi3.metric("Kelas Target", "Profit / Loss")
+
+    cm_col, report_col = st.columns([1, 1.2])
+
+    with cm_col:
+        cm_df = pd.DataFrame(
+            cm,
+            index=["Actual Loss", "Actual Profit"],
+            columns=["Predicted Loss", "Predicted Profit"]
+        )
+
+        fig_cm = px.imshow(
+            cm_df,
+            text_auto=True,
+            color_continuous_scale="Blues",
+            title="Confusion Matrix"
+        )
+
+        fig_cm.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="#eaf6ff",
+            height=430
+        )
+
         st.plotly_chart(fig_cm, use_container_width=True)
-        
-    with ml_col2:
-        st.markdown("**Classification Report Details:**")
-        report_df = pd.DataFrame(report).transpose().round(2)
-        st.dataframe(report_df, use_container_width=True, height=250)
+
+    with report_col:
+        st.markdown("#### Classification Report")
+        report_df = pd.DataFrame(report).transpose().round(3)
+        st.dataframe(report_df, use_container_width=True, height=420)
+
+    st.divider()
+
+    st.subheader("Faktor yang Paling Berpengaruh")
+
+    st.write(
+        "Bagian ini menunjukkan variabel yang paling banyak digunakan model dalam membedakan transaksi Profit dan Loss. "
+        "Nilai importance yang lebih tinggi menunjukkan kontribusi variabel yang lebih besar terhadap hasil klasifikasi."
+    )
+
+    fig_importance = px.bar(
+        importance_df,
+        x="Importance",
+        y="Feature",
+        orientation="h",
+        title="15 Faktor Teratas dalam Klasifikasi Profit/Loss",
+        color="Importance",
+        color_continuous_scale="Blues"
+    )
+
+    fig_importance.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#eaf6ff",
+        height=520,
+        yaxis=dict(autorange="reversed"),
+        margin=dict(t=55, b=30, l=30, r=30),
+        coloraxis_showscale=False
+    )
+
+    st.plotly_chart(fig_importance, use_container_width=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ---------------------------------
-# TAB 3: FORECASTING 2015
-# ---------------------------------
-with tab3:
-    st.subheader("Prediksi Penjualan & Keuntungan Tahun 2015")
-    st.markdown("Data pada tab ini merupakan hasil pemodelan Machine Learning (Time Series / Regresi) untuk memproyeksikan target performa bisnis di tahun 2015 berdasarkan tren historis.")
-    
+with tab_forecast:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+
+    st.subheader("Prediksi Sales dan Profit Tahun 2015")
+
+    st.write(
+        "Prediksi tahun 2015 dibuat menggunakan model regresi sederhana berbasis fitur waktu. "
+        "Data historis tahun 2011 sampai 2014 diringkas menjadi data bulanan sebelum digunakan dalam pemodelan."
+    )
+
     try:
         forecast_df = load_forecast()
+
         forecast_total_sales = forecast_df["predicted_sales"].sum()
         forecast_total_profit = forecast_df["predicted_profit"].sum()
-        forecast_margin = (forecast_total_profit / forecast_total_sales * 100) if forecast_total_sales != 0 else 0
+        forecast_margin = (
+            forecast_total_profit / forecast_total_sales * 100
+            if forecast_total_sales != 0
+            else 0
+        )
 
-        fcol1, fcol2, fcol3, fcol4 = st.columns(4)
-        fcol1.metric("Prediksi Total Sales 2015", f"${forecast_total_sales:,.2f}")
-        fcol2.metric("Prediksi Total Profit 2015", f"${forecast_total_profit:,.2f}")
-        fcol3.metric("Estimasi Profit Margin", f"{forecast_margin:.2f}%")
-        fcol4.metric("Status Data", "Berhasil Di-load ✓")
+        fc1, fc2, fc3 = st.columns(3)
 
-        st.write("")
-        fc_col1, fc_col2 = st.columns(2)
-        with fc_col1:
-            fig_forecast_sales = px.line(forecast_df, x="order_date", y="predicted_sales", markers=True, title="Tren Proyeksi Sales 2015", line_shape="spline", color_discrete_sequence=[chart_colors[0]])
-            fig_forecast_sales.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_forecast_sales, use_container_width=True)
-        with fc_col2:
-            fig_forecast_profit = px.line(forecast_df, x="order_date", y="predicted_profit", markers=True, title="Tren Proyeksi Profit 2015", line_shape="spline", color_discrete_sequence=[status_color_map["Profit"]])
-            fig_forecast_profit.update_layout(template=plot_template, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=text_col)
-            st.plotly_chart(fig_forecast_profit, use_container_width=True)
-            
+        fc1.metric("Estimasi Sales 2015", f"${forecast_total_sales:,.2f}")
+        fc2.metric("Estimasi Profit 2015", f"${forecast_total_profit:,.2f}")
+        fc3.metric("Estimasi Margin", f"{forecast_margin:.2f}%")
+
+        forecast_col1, forecast_col2 = st.columns(2)
+
+        with forecast_col1:
+            fig_fc_sales = px.line(
+                forecast_df,
+                x="order_date",
+                y="predicted_sales",
+                markers=True,
+                title="Prediksi Sales Bulanan 2015",
+                color_discrete_sequence=["#38d5ff"]
+            )
+
+            fig_fc_sales.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#eaf6ff",
+                height=400
+            )
+
+            st.plotly_chart(fig_fc_sales, use_container_width=True)
+
+        with forecast_col2:
+            fig_fc_profit = px.line(
+                forecast_df,
+                x="order_date",
+                y="predicted_profit",
+                markers=True,
+                title="Prediksi Profit Bulanan 2015",
+                color_discrete_sequence=["#3df5a0"]
+            )
+
+            fig_fc_profit.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font_color="#eaf6ff",
+                height=400
+            )
+
+            st.plotly_chart(fig_fc_profit, use_container_width=True)
+
+        st.subheader("Tabel Prediksi 2015")
+        st.dataframe(forecast_df, use_container_width=True)
+
     except FileNotFoundError:
-        st.error("❌ **File forecast_2015.csv belum ditemukan!** Pastikan Anda telah menjalankan script `forecast_model.py` terlebih dahulu.")
+        st.error("File forecast_2015.csv belum ditemukan. Jalankan dulu file forecast_model.py.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ---------------------------------
-# TAB 4: RAW DATA
-# ---------------------------------
-with tab4:
-    st.subheader("Database Transaksi")
-    st.markdown("Menampilkan tabel data historis yang sudah difilter melalui panel sidebar. Anda bisa mengunduh tabel ini ke dalam format `.csv` dengan mengklik ikon di pojok kanan atas tabel.")
-    st.dataframe(filtered_df, use_container_width=True, height=500)
+with tab_data:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+
+    st.subheader("Data Transaksi")
+    st.write("Tabel berikut menampilkan data transaksi sesuai filter yang dipilih.")
+
+    st.dataframe(filtered_df, use_container_width=True, height=520)
+
+    csv = filtered_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download Data Hasil Filter",
+        data=csv,
+        file_name="filtered_superstore_data.csv",
+        mime="text/csv"
+    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
