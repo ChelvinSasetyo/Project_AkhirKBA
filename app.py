@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 st.set_page_config(
     page_title="Dashboard Superstore",
-    page_icon="",
+    page_icon="📊",
     layout="wide"
 )
 
@@ -288,6 +288,10 @@ def train_profit_loss_model(data):
     return accuracy, cm, report, importance_df
 
 
+# =========================
+# LOAD DATA
+# =========================
+
 with st.sidebar:
     st.markdown("### Panel Filter")
     st.caption("Gunakan filter berikut untuk menyesuaikan data yang ditampilkan.")
@@ -309,6 +313,10 @@ else:
     df = load_default_data()
 
 
+# =========================
+# TITLE
+# =========================
+
 st.markdown(
     '<div class="main-title">Dashboard Analitik Penjualan Superstore</div>',
     unsafe_allow_html=True
@@ -319,6 +327,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+# =========================
+# SIDEBAR FILTER
+# =========================
 
 with st.sidebar:
     st.divider()
@@ -359,12 +371,19 @@ with st.sidebar:
         default=segment_options
     )
 
-    status_options = ["Profit", "Loss"]
-    selected_status = st.multiselect(
-        "Status Transaksi",
-        status_options,
-        default=status_options
-    )
+    st.markdown("### Checkbox Tampilan")
+
+    show_profit = st.checkbox("Tampilkan transaksi Profit", value=True)
+    show_loss = st.checkbox("Tampilkan transaksi Loss", value=True)
+    show_table = st.checkbox("Tampilkan tabel data", value=True)
+
+    selected_status = []
+
+    if show_profit:
+        selected_status.append("Profit")
+
+    if show_loss:
+        selected_status.append("Loss")
 
     min_date = df["order_date"].min().date()
     max_date = df["order_date"].max().date()
@@ -381,6 +400,10 @@ with st.sidebar:
         value=10
     )
 
+
+# =========================
+# FILTER DATA
+# =========================
 
 filtered_df = df[
     (df["year"].astype(int).isin(selected_year)) &
@@ -405,6 +428,10 @@ if filtered_df.empty:
     st.warning("Tidak ada data yang sesuai dengan filter yang dipilih.")
     st.stop()
 
+
+# =========================
+# KPI
+# =========================
 
 total_sales = filtered_df["sales"].sum()
 total_profit = filtered_df["profit"].sum()
@@ -455,6 +482,10 @@ kpi5.markdown(
 st.markdown("<br>", unsafe_allow_html=True)
 
 
+# =========================
+# TABS
+# =========================
+
 tab_overview, tab_ml, tab_forecast, tab_data = st.tabs([
     "Ringkasan Data",
     "Model Klasifikasi",
@@ -462,6 +493,10 @@ tab_overview, tab_ml, tab_forecast, tab_data = st.tabs([
     "Tabel Data"
 ])
 
+
+# =========================
+# TAB 1: OVERVIEW
+# =========================
 
 with tab_overview:
     row1_col1, row1_col2, row1_col3 = st.columns([1.2, 2.2, 1.2])
@@ -762,6 +797,10 @@ with tab_overview:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+# =========================
+# TAB 2: MACHINE LEARNING
+# =========================
+
 with tab_ml:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
 
@@ -846,6 +885,10 @@ with tab_ml:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+# =========================
+# TAB 3: FORECAST
+# =========================
+
 with tab_forecast:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
 
@@ -924,21 +967,28 @@ with tab_forecast:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+# =========================
+# TAB 4: DATA TABLE
+# =========================
+
 with tab_data:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
 
     st.subheader("Data Transaksi")
     st.write("Tabel berikut menampilkan data transaksi sesuai filter yang dipilih.")
 
-    st.dataframe(filtered_df, use_container_width=True, height=520)
+    if show_table:
+        st.dataframe(filtered_df, use_container_width=True, height=520)
 
-    csv = filtered_df.to_csv(index=False).encode("utf-8")
+        csv = filtered_df.to_csv(index=False).encode("utf-8")
 
-    st.download_button(
-        label="Download Data Hasil Filter",
-        data=csv,
-        file_name="filtered_superstore_data.csv",
-        mime="text/csv"
-    )
+        st.download_button(
+            label="Download Data Hasil Filter",
+            data=csv,
+            file_name="filtered_superstore_data.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Tabel data sedang disembunyikan. Centang kembali opsi 'Tampilkan tabel data' di sidebar untuk menampilkannya.")
 
     st.markdown("</div>", unsafe_allow_html=True)
